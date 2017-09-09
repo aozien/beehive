@@ -1,0 +1,19 @@
+{
+  "name": "beehive-mpp",
+  "version": "0.0.3",
+  "description": "a basic massively parallel processing module that works with websites and uses client side processing power to complete tasks",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tarekelwkeel/beehive.git"
+  },
+  "author": "tarekelwkeel",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tarekelwkeel/beehive/issues"
+  },
+  "homepage": "https://github.com/tarekelwkeel/beehive#readme"
+}
