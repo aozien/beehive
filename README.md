@@ -1,7 +1,8 @@
 # Beehive Massive Parallel Processing (beehive-mpp)
-combine the processing power of your website's visitors' computers to create a one large network of processors that's capable of solving large complex problems without overburdening your server 
+combine the processing power of your website's visitors' computers to create a one large network of processors that's capable of solving large complex problems without overburdening your server.
+note that it only uses about 20% from the processing power of client side computers minimizing its effect on user experience.
 
-## how it works 
+## How it works 
 the module transfers the load of processing large repetitive tasks from server side to client side computers, as it divides large repetitive tasks to smaller ones, the smaller tasks is then to be sent and processed on client side , the result will be sent back to the server and -optionally- checked by a different client visiting the site.
 it's more handy in tasks that require doing a repetitive task with large amount of data such as training a neural network in machine learning.
 
@@ -13,7 +14,7 @@ install and save module
 npm install beehive-mpp -s
 ```
 then require it  in the route file 
-```
+```javascript
 var Hive = require('beehive-mpp').Hive(options);
 
 
@@ -24,7 +25,7 @@ app.use('/Hive', function (req, res, next) {
 });
 ```
 and in client side hmtl pages add this js file to them
-```
+```html
 <script src="dist/bee.js"></script>
 <script> 
  var bee = new Bee('/Hive');
@@ -32,7 +33,7 @@ and in client side hmtl pages add this js file to them
 </script>
 
 ```
-#### options available for Hive object :
+#### Options available for Hive object :
 * beeTimeout :(time in ms) time it should wait before considering the bee expired (client side disconnected), default ->20000 which is 20 seconds
 * checkPercent : (number from 0 to 100) it means there's X (X: X<=100 & X>=0) chance that the data from client side is to be checked
 * logging : boolean determines whether or not it should display log in the console , default -> true
@@ -40,7 +41,7 @@ and in client side hmtl pages add this js file to them
 ### Usage
 
 #### Setting up route and processing requests ( Hive.request(req,res) )
-```
+```javascript
 app.use('/Hive', function (req, res, next) {
   Hive.request(req, res);
   res.end();
@@ -51,7 +52,7 @@ app.use('/Hive', function (req, res, next) {
 
 Used to assign the function and dataset to the hive ,the dataset will be later broken into smaller batches and added to the process queue to be processed by the clientside then to be checked by another pc
 
-```
+```javascript
 Hive.addTask(options,callback)
 ```
 ##### The options object:
@@ -65,7 +66,7 @@ Hive.addTask(options,callback)
 
 ### Examples on different ways for adding tasks
 
-```
+```javascript
 //backend 
 Hive.addTask({
     fn: 'sum' , dataSet : [[1,2] , [3,5]] , batchSize:1 
@@ -83,7 +84,7 @@ var bee = new Bee('/Hive');
 ```
 
 or 
-```
+```javascript
 //backend 
 Hive.addTask({
     fn: function task(a,b){
@@ -99,10 +100,12 @@ var bee = new Bee('/Hive');
 
 ```
 the result in both cases would be the same object
+```javascript
 {
     '0-0':[3] ,
     '1-1':[8]
 }
+```
 ## Authors
 
 * **Tarek Elwkeel** - *Initial work* - [Tarek Elwkeel](https://github.com/tarekelwkeel)
