@@ -1,22 +1,19 @@
 'use strict';
 var Bee = require("./Bee.js");
 
-
 function Hive(opts) {
-    var self =this; 
+    var self = this;
     var opts = opts ? opts : {};
     self.hiveMap = {};
     self.fnsMap = {};
-    self.fnsMap['0000'] = { fn: function(){}, state: '0/00', batchSize: 1, timePerIteration: 400, rate: 10, callback: null };//state waiting started finished
-    self.dataSourceMap = { '0000': [ [0]] }
+    self.fnsMap['0000'] = { fn: function () { }, state: '0/00', batchSize: 1, timePerIteration: 400, rate: 10, callback: null };//state waiting started finished
+    self.dataSourceMap = { '0000': [[0]] }
     self.processQueue = [];
     self.processing = [];
     self.processDone = {};
-    self.hiveCode = getID('hive');
-    self.checkPercent = opts.percent ? opts.percent : 100;
-    self.beeTimeout = opts.beeTimeout ? opts.beeTimeout : 20000;
-
-
+    self.checkPercent = opts.hasOwnProperty('checkPercent')? opts.checkPercent : 100;
+    self.beeTimeout = opts.hasOwnProperty('beeTimeout') ? opts.beeTimeout : 20000;
+    self.logging = opts.hasOwnProperty('logging') ? opts.logging : true;
     function chunkify(_id, LengthOfData, chunk) {
         for (var i = 0; i < Math.floor(LengthOfData / chunk); i++) {
             self.processQueue.push(OneProcess(_id, i * chunk, (i + 1) * chunk - 1));
@@ -71,7 +68,7 @@ function Hive(opts) {
                     chosenProcess.timeStarted = Date.now()
                     chosenProcess.estimatedFinish = Date.now() + Math.ceil(self.fnsMap[chosenProcess.fnID].batchSize * self.fnsMap[chosenProcess.fnID].timePerIteration)
                     self.processQueue.splice(i, 1);
-                    i=tempArr.length;
+                    i = tempArr.length;
                 }
             }
             chosenProcess = chosenProcess ? chosenProcess : OneProcess('0000', 0, 1);
@@ -90,123 +87,126 @@ function Hive(opts) {
     }
 
 
-    return {
-        addWorker: function (bee) {
-            self.hiveMap[bee.uId] = bee;
-            getWork(bee);
-        },
-        deleteWorker: function (uId) {
-            if (uId && uId.length == 26 && uId.split('-').length == 3) {
-                this.returnProcess(self.hiveMap[uId].p_id);
-                delete self.hiveMap[uId];
-            }
-        },
-        returnProcess: function (p_id) {
-            var processIndex = search(self.processing, 'p_id', p_id);
-            if (processIndex != -1) {
-                self.processQueue.unshift(OneProcess(self.processing[processIndex].fnID, self.processing[processIndex].start, self.processing[processIndex].end))
-                self.processing.splice(processIndex, 1)
-            }
-        },
-        endProcess: function (p_id) {
-            var processIndex = search(self.processing, 'p_id', p_id);
-            if (processIndex != -1) {
-                self.hiveMap[self.processing[processIndex].workerID].p_id = false;
-                self.processing.splice(processIndex, 1)
-            }
+    self.addWorker = function (bee) {
+        self.hiveMap[bee.uId] = bee;
+        getWork(bee);
+    }
+    self.deleteWorker = function (uId) {
+        if (uId && uId.length == 26 && uId.split('-').length == 3) {
+            self.returnProcess(self.hiveMap[uId].p_id);
+            delete self.hiveMap[uId];
+        }
+    }
+    self.returnProcess = function (p_id) {
+        var processIndex = search(self.processing, 'p_id', p_id);
+        if (processIndex != -1) {
+            self.processQueue.unshift(OneProcess(self.processing[processIndex].fnID, self.processing[processIndex].start, self.processing[processIndex].end))
+            self.processing.splice(processIndex, 1)
+        }
+    }
+    self.endProcess = function (p_id) {
+        var processIndex = search(self.processing, 'p_id', p_id);
+        if (processIndex != -1) {
+            self.hiveMap[self.processing[processIndex].workerID].p_id = false;
+            self.processing.splice(processIndex, 1)
+        }
 
-        },
-        saveWork: function (uId, fnID, data) {
-            if (uId && self.hiveMap[uId] && self.hiveMap[uId].fnID == fnID) {
-                var currentBee = self.hiveMap[uId]
-                var processIndex = search(self.processing, 'p_id', currentBee.p_id);
-                if (processIndex > -1 && self.processing[processIndex].fnID == fnID) {
-                    var currentProcess = self.processing[processIndex];
-                    if (currentProcess.type == 'new' && Math.random() * 100 <= self.checkPercent) {
-                        this.check(currentBee, currentProcess, data);
-                    } else if (currentProcess.type == 'check') {
+    }
+    self.saveWork = function (uId, fnID, data) {
+        if (uId && self.hiveMap[uId] && self.hiveMap[uId].fnID == fnID) {
+            var currentBee = self.hiveMap[uId]
+            var processIndex = search(self.processing, 'p_id', currentBee.p_id);
+            if (processIndex > -1 && self.processing[processIndex].fnID == fnID) {
+                var currentProcess = self.processing[processIndex];
+                if (currentProcess.type == 'new' && Math.random() * 100 <= self.checkPercent) {
+                    self.check(currentBee, currentProcess, data);
+                } else if (currentProcess.type == 'check') {
 
-                        if (data[0] == 'false') {
-                            currentProcess.result = data[1];
-                            this.check(currentBee, currentProcess, data[1])
-                        } else {
-                            self.processDone[fnID][currentProcess.start + '-' + currentProcess.end] = currentBee.resultToCheck;
-                            currentBee.resultToCheck = [];
-                            self.fnsMap[fnID].state = (parseInt(self.fnsMap[fnID].state.split("/")[0]) + 1) + '/' + self.fnsMap[fnID].state.split("/")[1]
-                            if (self.fnsMap[fnID].state.split("/")[0] == self.fnsMap[fnID].state.split("/")[1]) {
-                                self.fnsMap[fnID].callback(self.processDone[fnID]);
-                            }
-                            this.endProcess(currentProcess.p_id)
-                        }
-
+                    if (data[0] == 'false') {
+                        currentProcess.result = data[1];
+                        self.check(currentBee, currentProcess, data[1])
                     } else {
-                        self.processDone[fnID][currentProcess.start + '-' + currentProcess.end] = data;
+                        self.processDone[fnID][currentProcess.start + '-' + currentProcess.end] = currentBee.resultToCheck;
+                        currentBee.resultToCheck = [];
                         self.fnsMap[fnID].state = (parseInt(self.fnsMap[fnID].state.split("/")[0]) + 1) + '/' + self.fnsMap[fnID].state.split("/")[1]
                         if (self.fnsMap[fnID].state.split("/")[0] == self.fnsMap[fnID].state.split("/")[1]) {
                             self.fnsMap[fnID].callback(self.processDone[fnID]);
                         }
-                        this.endProcess(currentProcess.p_id)
+                        self.endProcess(currentProcess.p_id)
                     }
-                } else {
-                    }
-            }
-            else {
-            }
 
-        },
-        check: function (bee, currentProcess, data) {
-            self.processQueue.unshift(OneProcess(bee.fnID, currentProcess.start, currentProcess.end, 0, 0, data, bee.uId))
-            this.endProcess(currentProcess.p_id)
-        },
-        addTask: function (opts, callback) {
-            if (!opts.fn || !opts.dataSet) { throw new Error('missing a function (fn) or a dataSet parameter ') }
-            opts.batchSize = opts.batchSize ? opts.batchSize : Math.round(opts.dataSet.length / 100);
-            var _id = opts.name?getID(name) : getID('fn');
-            self.processDone[_id] = {};
-            self.fnsMap[_id] = {}
-            self.fnsMap[_id].fn = opts.fn;
-            self.fnsMap[_id].batchSize = opts.batchSize;
-            self.fnsMap[_id].delay = opts.delay ? opts.delay : 0;
-            self.fnsMap[_id].timePerIteration = opts.timePerIteration ? opts.timePerIteration : 1;
-            self.fnsMap[_id].callback = (typeof callback === 'function') ? callback : function() {};
-            self.dataSourceMap[_id] = opts.dataSet;
-            chunkify(_id, opts.dataSet.length, opts.batchSize)
-        },
-        request: function (req, res) {
-            // console.log('Hive Got a request of type ', req.body.type)
-            switch (req.body.type) {
-                case 'new':
-                    if (!req.cookies.beeID || (req.cookies.beeID  && eval(req.cookies.expire) < Date.now())) {
-                        if (req.cookies.beeID && self.hiveMap[req.cookies.beeID]) { this.deleteWorker(req.cookies.beeID) }
-                        var bee = new Bee();
-                        this.addWorker(bee);
-                        bee.lastSeen = Date.now()
-                        res.cookie('beeID', bee.uId)
-                        res.cookie('expire', Date.now() + self.beeTimeout)
-                        res.send({ uId: bee.uId, fn: bee.fn.toString(), DS: bee.dataSet, fnID: bee.fnID, delay: self.fnsMap[bee.fnID].delay, type: bee.workType, result: bee.resultToCheck })
+                } else {
+                    self.processDone[fnID][currentProcess.start + '-' + currentProcess.end] = data;
+                    self.fnsMap[fnID].state = (parseInt(self.fnsMap[fnID].state.split("/")[0]) + 1) + '/' + self.fnsMap[fnID].state.split("/")[1]
+                    if (self.fnsMap[fnID].state.split("/")[0] == self.fnsMap[fnID].state.split("/")[1]) {
+                        self.fnsMap[fnID].callback(self.processDone[fnID]);
                     }
-                    else {  }
-                    break;
-                case 'close':
-                    this.deleteWorker(req.body.uId)
-                    res.cookie('beeID', null)
-                    break;
-                case 'save':
-                    if (req.body.fnID != '0000') {
-                        this.saveWork(req.body.uId, req.body.fnID, req.body.Result)
-                    }
-                    getWork(self.hiveMap[req.body.uId])
-                    var bee = self.hiveMap[req.body.uId];
-                    bee.lastSeen = Date.now();
-                    res.cookie('expire', Date.now() + self.beeTimeout)
-                    res.send({ uId: bee.uId, fn: bee.fn.toString(), DS: bee.dataSet, fnID: bee.fnID, delay: self.fnsMap[bee.fnID].delay, type: bee.workType, result: bee.resultToCheck })
-                    break;
+                    self.endProcess(currentProcess.p_id)
+                }
+            } else {
             }
-            
-            pr(`Hive:> Queued ${self.processQueue.length} Processing ${self.processing.length} Workers ${Object.keys(self.hiveMap).length}`, 'c')
-            pr(' '+self.processing.map(function (a, i) { return `${i}:${a.fnID} state (${self.fnsMap[a.fnID].state}) from (${a.start}:${a.end}) \n ` }).toString().replace(/,/ig,''), 'c')
-        },Hive:self
+        }
+        else {
+        }
+
     }
+    self.check = function (bee, currentProcess, data) {
+        self.processQueue.unshift(OneProcess(bee.fnID, currentProcess.start, currentProcess.end, 0, 0, data, bee.uId))
+        self.endProcess(currentProcess.p_id)
+    }
+    self.addTask = function (opts, callback) {
+        if (!opts.fn || !opts.dataSet) { throw new Error('missing a function (fn) or a dataSet parameter ') }
+        opts.batchSize = opts.batchSize ? opts.batchSize : Math.round(opts.dataSet.length / 100);
+        var _id = opts.name ? getID(name) : getID('fn');
+        self.processDone[_id] = {};
+        self.fnsMap[_id] = {}
+        self.fnsMap[_id].fn = opts.fn;
+        self.fnsMap[_id].batchSize = opts.batchSize;
+        self.fnsMap[_id].delay = opts.delay ? opts.delay : 100;
+        self.fnsMap[_id].timePerIteration = opts.timePerIteration ? opts.timePerIteration : 1;
+        self.fnsMap[_id].callback = (typeof callback === 'function') ? callback : function () { };
+        self.dataSourceMap[_id] = opts.dataSet;
+        chunkify(_id, opts.dataSet.length, opts.batchSize)
+    }
+    self.request = function (req, res) {
+        // console.log('Hive Got a request of type ', req.body.type)
+        switch (req.body.type) {
+            case 'new':
+                if (!req.cookies.beeID || (req.cookies.beeID && eval(req.cookies.expire) < Date.now())) {
+                    if (req.cookies.beeID && self.hiveMap[req.cookies.beeID]) { self.deleteWorker(req.cookies.beeID) }
+                    var bee = new Bee();
+                    self.addWorker(bee);
+                    bee.lastSeen = Date.now()
+                    res.cookie('beeID', bee.uId)
+                    res.cookie('expire', Date.now() + self.beeTimeout)
+                    var task = (typeof bee.fn === 'function') ? bee.fn.toString() :bee.fn ;
+                    res.send({ uId: bee.uId, fn: task , DS: bee.dataSet, fnID: bee.fnID, delay: self.fnsMap[bee.fnID].delay, type: bee.workType, result: bee.resultToCheck })
+                }
+                else { }
+                break;
+            case 'close':
+                self.deleteWorker(req.body.uId)
+                res.cookie('beeID', null)
+                break;
+            case 'save':
+                if (req.body.fnID != '0000') {
+                    self.saveWork(req.body.uId, req.body.fnID, req.body.Result)
+                }
+                getWork(self.hiveMap[req.body.uId])
+                var bee = self.hiveMap[req.body.uId];
+                bee.lastSeen = Date.now();
+                res.cookie('expire', Date.now() + self.beeTimeout)
+                var task = (typeof bee.fn === 'function') ? bee.fn.toString() :bee.fn ;
+                res.send({ uId: bee.uId, fn: bee.fn.toString(), DS: bee.dataSet, fnID: bee.fnID, delay: self.fnsMap[bee.fnID].delay, type: bee.workType, result: bee.resultToCheck })
+                break;
+        }
+
+        if (self.logging == true) {
+            pr(`Hive:> Queued ${self.processQueue.length} Processing ${self.processing.length} Workers ${Object.keys(self.hiveMap).length}`, 'c')
+            pr(' ' + self.processing.map(function (a, i) { return `${i}:${a.fnID} state (${self.fnsMap[a.fnID].state}) from (${a.start}:${a.end}) \n ` }).toString().replace(/,/ig, ''), 'c')
+        }
+    }
+    return self;
 
 }
 
@@ -266,7 +266,7 @@ function pr(text, color) {
             t = '\x1b[41m'
             break;
     }
-     console.log(t + '%s\x1b[0m', text)
+    console.log(t + '%s\x1b[0m', text)
 }
 
 

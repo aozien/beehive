@@ -1,6 +1,6 @@
 {
   "name": "beehive-mpp",
-  "version": "0.0.3",
+  "version": "0.0.7",
   "description": "a basic massively parallel processing module that works with websites and uses client side processing power to complete tasks",
   "main": "index.js",
   "scripts": {
